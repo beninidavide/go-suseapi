@@ -1,45 +1,65 @@
+// Package bugzilla can get bugs, attachments and update them
+// Instead of the nice XMLRPC interface, it uses the web interface, in
+// order to allow changing flags (AFAIR) not available in the API.
 package bugzilla
 
 import (
 	"encoding/base64"
+	"encoding/json"
 	"encoding/xml"
 	"fmt"
-	"github.com/PuerkitoBio/goquery"
-	"github.com/headzoo/surf"
-	"github.com/headzoo/surf/browser"
 	"io"
 	"io/ioutil"
+	"mime"
 	"net/http"
 	"net/url"
 	"path"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
+
+	"github.com/PuerkitoBio/goquery"
+	"github.com/headzoo/surf"
+	"github.com/headzoo/surf/browser"
 )
 
+// RequestError happens when building the request
 type RequestError struct{ error }
 
 func (e RequestError) Error() string {
 	return fmt.Sprintf("cannot build request: %v", e.error)
 }
 
+// ConnectionError happens when performing the request
 type ConnectionError struct{ error }
 
 func (e ConnectionError) Error() string {
 	return fmt.Sprintf("cannot communicate with server: %v", e.error)
 }
 
+// Cacher should be anything that takes the name of the object to be cached
+// and returns something that can receive writes with the contents and then
+// eventually be closed.
+type Cacher interface {
+	GetWriter(id string) io.WriteCloser
+}
+
+// Config sets the parameters needed to set up the client. Cacher can be
+// left zeroed.
 type Config struct {
 	BaseURL  string
 	User     string
 	Password string
+	Cacher   Cacher
 }
 
+// Client keeps the state of the client.
 type Client struct {
 	Config        Config
 	browser       *browser.Browser
 	seriousClient *http.Client
-	showBugUrl    string
+	cacher        Cacher
 }
 
 func getAuth(config *Config) string {
@@ -58,16 +78,17 @@ func getBrowser(config *Config) *browser.Browser {
 func getDecentHTTPClient(config *Config) *http.Client {
 	tr := http.DefaultClient.Transport
 	client := http.Client{Transport: tr}
-	rt := WithHeader(tr)
+	rt := useHeader(tr)
 	rt.Set("Authorization", getAuth(config))
 	client.Transport = rt
 	return &client
 }
 
+// New prepares a *Client for connecting to the Bugzilla Web interface
 func New(config Config) (*Client, error) {
 	browser := getBrowser(&config)
 	seriousClient := getDecentHTTPClient(&config)
-	client := &Client{Config: config, browser: browser, seriousClient: seriousClient}
+	client := &Client{Config: config, browser: browser, seriousClient: seriousClient, cacher: config.Cacher}
 	return client, nil
 }
 
@@ -76,7 +97,7 @@ type withHeader struct {
 	rt http.RoundTripper
 }
 
-func WithHeader(rt http.RoundTripper) withHeader {
+func useHeader(rt http.RoundTripper) withHeader {
 	if rt == nil {
 		rt = http.DefaultTransport
 	}
@@ -110,125 +131,149 @@ func (c *Client) getShowBugURL(id int, values map[string]string) (string, error)
 	return url.String(), nil
 }
 
+func (c *Client) getDownloadURL(id int) (string, error) {
+	url, err := url.Parse(c.Config.BaseURL)
+	if err != nil {
+		return "", RequestError{err}
+	}
+
+	url.Path = path.Join(url.Path, "attachment.cgi")
+
+	query := url.Query()
+	query.Set("id", fmt.Sprintf("%d", id))
+	url.RawQuery = query.Encode()
+
+	return url.String(), nil
+}
+
+// User represents user as used in assigned_to, comment author and other
+// fields (except Cc.)
 type User struct {
-	Name  string `xml:"name,attr"`
-	Email string `xml:",chardata"`
+	Name  string `xml:"name,attr" json:"name"`
+	Email string `xml:",chardata" json:"email"`
 }
 
+// Group is a group as seen by Bugzilla
 type Group struct {
-	Id   int    `xml:"id,attr"`
-	Name string `xml:",chardata"`
+	ID   int    `xml:"id,attr" json:"id"`
+	Name string `xml:",chardata" json:"email"`
 }
 
+// Flag represents flags such as needinfo
 type Flag struct {
-	Name      string `xml:"name,attr"`
-	Id        int    `xml:"id,attr"`
-	TypeId    int    `xml:"type_id,attr"`
-	Status    string `xml:"status,attr"`
-	Setter    string `xml:"setter,attr"`
-	Requestee string `xml:"requestee,attr"`
+	Name      string `xml:"name,attr" json:"name"`
+	ID        int    `xml:"id,attr" json:"id"`
+	TypeID    int    `xml:"type_id,attr" json:"type_id"`
+	Status    string `xml:"status,attr" json:"status"`
+	Setter    string `xml:"setter,attr" json:"setter"`
+	Requestee string `xml:"requestee,attr" json:"requestee"`
 }
 
+// Bug is a Bug in Bugzilla
 type Bug struct {
-	Reporter   User `xml:"reporter"`
-	AssignedTo User `xml:"assigned_to"`
-	QAContact  User `xml:"qa_contact"`
+	Reporter   User `xml:"reporter" json:"reporter"`
+	AssignedTo User `xml:"assigned_to" json:"assigned_to"`
+	QAContact  User `xml:"qa_contact" json:"qa_contact"`
 
-	Groups []Group `xml:"group"`
+	Groups []Group `xml:"group" json:"group"`
 
-	BugId              int       `xml:"bug_id"` // 1047068
+	BugID              int       `xml:"bug_id" json:"bug_id"` // 1047068
 	CreationTS         time.Time // 2017-07-03 13:29:00 +0000
-	ShortDesc          string    `xml:"short_desc"` // L4: test cloud bug
+	ShortDesc          string    `xml:"short_desc" json:"short_desc"` // L4: test cloud bug
 	DeltaTS            time.Time // 2019-03-27 10:45:20 +0000
-	ReporterAccessible int       `xml:"reporter_accessible"` // 0
-	CCListAccessible   int       `xml:"cclist_accessible"`   // 0
-	ClassificationID   int       `xml:"classification_id"`   // 111
-	Classification     string    `xml:"classification"`      // foobar Frobnicator Cloud
-	Product            string    `xml:"product"`             // foobar Frobnicator Cloud 7
-	Component          string    `xml:"component"`           // Frobtool
-	Version            string    `xml:"version"`             // Milestone 8
-	RepPlatform        string    `xml:"rep_platform"`        // Other
-	OpSys              string    `xml:"op_sys"`              // Other
-	BugStatus          string    `xml:"bug_status"`          // RESOLVED
-	Resolution         string    `xml:"resolution"`          // FIXED
-	DupId              int       `xml:"dup_id"`
+	ReporterAccessible int       `xml:"reporter_accessible" json:"reporter_accessible"` // 0
+	CCListAccessible   int       `xml:"cclist_accessible" json:"cclist_accessible"`     // 0
+	ClassificationID   int       `xml:"classification_id" json:"classification_id"`     // 111
+	Classification     string    `xml:"classification" json:"classification"`           // foobar Frobnicator Cloud
+	Product            string    `xml:"product" json:"product"`                         // foobar Frobnicator Cloud 7
+	Component          string    `xml:"component" json:"component"`                     // Frobtool
+	Version            string    `xml:"version" json:"version"`                         // Milestone 8
+	RepPlatform        string    `xml:"rep_platform" json:"rep_platform"`               // Other
+	OpSys              string    `xml:"op_sys" json:"op_sys"`                           // Other
+	BugStatus          string    `xml:"bug_status" json:"bug_status"`                   // RESOLVED
+	Resolution         string    `xml:"resolution" json:"resolution"`                   // FIXED
+	DupID              int       `xml:"dup_id" json:"dup_id"`
 
-	BugFileLoc       string `xml:"bug_file_loc"`      //
-	StatusWhiteboard string `xml:"status_whiteboard"` // wasL3:48626  zzz
-	Keywords         string `xml:"keywords"`          // DSLA_REQUIRED, DSLA_SOLUTION_PROVIDED
-	Priority         string `xml:"priority"`          // P5 - None
-	BugSeverity      string `xml:"bug_severity"`      // Normal
-	TargetMilestone  string `xml:"target_milestone"`  // ---
+	BugFileLoc       string `xml:"bug_file_loc" json:"bug_file_loc"`           //
+	StatusWhiteboard string `xml:"status_whiteboard" json:"status_whiteboard"` // wasL3:48626  zzz
+	Keywords         string `xml:"keywords" json:"keywords"`                   // DSLA_REQUIRED, DSLA_SOLUTION_PROVIDED
+	Priority         string `xml:"priority" json:"priority"`                   // P5 - None
+	BugSeverity      string `xml:"bug_severity" json:"bug_severity"`           // Normal
+	TargetMilestone  string `xml:"target_milestone" json:"target_milestone"`   // ---
 
-	EverConfirmed int      `xml:"everconfirmed"`  // 1
-	Cc            []string `xml:"cc"`             // user@foobar.com
-	EstimatedTime string   `xml:"estimated_time"` // 0.00
-	RemainingTime string   `xml:"remaining_time"` // 0.00
-	ActualTime    string   `xml:"actual_time"`    // 0.00
+	EverConfirmed int      `xml:"everconfirmed" json:"everconfirmed"`   // 1
+	Cc            []string `xml:"cc" json:"cc"`                         // user@foobar.com
+	EstimatedTime string   `xml:"estimated_time" json:"estimated_time"` // 0.00
+	RemainingTime string   `xml:"remaining_time" json:"remaining_time"` // 0.00
+	ActualTime    string   `xml:"actual_time" json:"actual_time"`       // 0.00
 
-	CfFoundby       []string `xml:"cf_foundby"`       // ---
-	CfNts_priority  []string `xml:"cf_nts_priority"`  //
-	CfBiz_priority  []string `xml:"cf_biz_priority"`  //
-	CfBlocker       []string `xml:"cf_blocker"`       // ---
-	CfIITDeployment []string `xml:"cf_it_deployment"` // ---
-	Token           []string `xml:"token"`
+	CfFoundby       []string `xml:"cf_foundby" json:"cf_foundby"`             // ---
+	CfNtsPriority   []string `xml:"cf_nts_priority" json:"cf_nts_priority"`   //
+	CfBizPriority   []string `xml:"cf_biz_priority" json:"cf_biz_priority"`   //
+	CfBlocker       []string `xml:"cf_blocker" json:"cf_blocker"`             // ---
+	CfIITDeployment []string `xml:"cf_it_deployment" json:"cf_it_deployment"` // ---
+	Token           []string `xml:"token" json:"token"`
 
-	Votes int `xml:"votes"` // 0
+	Votes int `xml:"votes" json:"votes"` // 0
 
-	Flags []Flag `xml:"flag"`
+	Flags []Flag `xml:"flag" json:"flag"`
 
-	CommentSortOrder string `xml:"comment_sort_order"` // oldest_to_newest
+	CommentSortOrder string `xml:"comment_sort_order" json:"comment_sort_order"` // oldest_to_newest
 
-	Comments    []Comment
-	Attachments []Attachment
+	Comments    []*Comment
+	Attachments []*Attachment
 }
 
 type shadowBug struct {
 	Bug
-	CreationTS  bzTime             `xml:"creation_ts"` // 2017-07-03 13:29:00 +0000
-	DeltaTS     bzTime             `xml:"delta_ts"`    // 2019-03-27 10:45:20 +0000
-	Attachments []shadowAttachment `xml:"attachment"`
-	Comments    []shadowComment    `xml:"long_desc"`
+	CreationTS  bzTime             `xml:"creation_ts" json:"creation_ts"` // 2017-07-03 13:29:00 +0000
+	DeltaTS     bzTime             `xml:"delta_ts" json:"delta_ts"`       // 2019-03-27 10:45:20 +0000
+	Attachments []shadowAttachment `xml:"attachment" json:"attachment"`
+	Comments    []shadowComment    `xml:"long_desc" json:"long_desc"`
 }
 
+// Attachment as provided by the bug information page. This struct has only
+// name, size and attachid set when coming from DownloadAttachment, as it's
+// extracted from the HTTP headers.
 type Attachment struct {
-	IsObsolete int       `xml:"isobsolete,attr"`
-	IsPatch    int       `xml:"ispatch,attr"`
-	IsPrivate  int       `xml:"isprivate,attr"`
-	AttachId   int       `xml:"attachid"`
-	Date       time.Time // `xml:"date"`
-	DeltaTS    time.Time // `xml:"delta_ts"`
-	Desc       string    `xml:"desc"`
-	Filename   string    `xml:"filename"`
-	Type       string    `xml:"type"`
-	Size       int       `xml:"size"`
-	Attacher   User      `xml:"attacher"`
-	Token      string    `xml:"token"`
+	IsObsolete int       `xml:"isobsolete,attr" json:"isobsolete"`
+	IsPatch    int       `xml:"ispatch,attr" json:"ispatch"`
+	IsPrivate  int       `xml:"isprivate,attr" json:"isprivate"`
+	AttachID   int       `xml:"attachid" json:"attachid"`
+	Date       time.Time // `xml:"date" json:"date"`
+	DeltaTS    time.Time // `xml:"delta_ts" json:"delta_ts"`
+	Desc       string    `xml:"desc" json:"desc"`
+	Filename   string    `xml:"filename" json:"filename"`
+	Type       string    `xml:"type" json:"type"`
+	Size       int       `xml:"size" json:"size"`
+	Attacher   User      `xml:"attacher" json:"attacher"`
+	Token      string    `xml:"token" json:"token"`
 }
 
 type shadowAttachment struct {
 	Attachment
-	Date    bzTime `xml:"date"`
-	DeltaTS bzTime `xml:"delta_ts"`
+	Date    bzTime `xml:"date" json:"date"`
+	DeltaTS bzTime `xml:"delta_ts" json:"delta_ts"`
 }
 
+// Comment as in bug comments
 type Comment struct {
-	IsPrivate int  `xml:"is_private,attr"`
-	Id        int  `xml:"commentid"`
-	Count     int  `xml:"comment_count"`
-	Who       User `xml:"who"`
+	IsPrivate int  `xml:"isprivate,attr" json:"isprivate"`
+	ID        int  `xml:"commentid" json:"commentid"`
+	Count     int  `xml:"comment_count" json:"comment_count"`
+	Who       User `xml:"who" json:"who"`
 	BugWhen   time.Time
-	TheText   string `xml:"thetext"`
+	TheText   string `xml:"thetext" json:"thetext"`
 }
 
 type shadowComment struct {
 	Comment
-	BugWhen bzTime `xml:"bug_when"`
+	BugWhen bzTime `xml:"bug_when" json:"bug_when"`
 }
 
-type Result struct {
-	XMLName xml.Name  `xml:"bugzilla"`
-	Shadow  shadowBug `xml:"bug"`
+type xmlResult struct {
+	XMLName xml.Name  `xml:"bugzilla" json:"bugzilla"`
+	Shadow  shadowBug `xml:"bug" json:"bug"`
 }
 
 // A wrapper that represents the time based on the format emitted by
@@ -247,7 +292,7 @@ func (m *bzTime) UnmarshalText(p []byte) error {
 }
 
 func (c *Client) decodeBug(data []byte) (*Bug, error) {
-	var result Result
+	var result xmlResult
 	err := xml.Unmarshal(data, &result)
 	if err != nil {
 		return nil, ConnectionError{err}
@@ -264,22 +309,37 @@ func (c *Client) decodeBug(data []byte) (*Bug, error) {
 		att = shadowAttachment.Attachment
 		att.Date = shadowAttachment.Date.Time
 		att.DeltaTS = shadowAttachment.DeltaTS.Time
-		bug.Attachments = append(bug.Attachments, att)
+		bug.Attachments = append(bug.Attachments, &att)
 	}
-	bug.Comments = make([]Comment, len(result.Shadow.Comments))
-	for i, shadowComment := range result.Shadow.Comments {
-		bug.Comments[i] = shadowComment.Comment
-		bug.Comments[i].BugWhen = shadowComment.BugWhen.Time
+	for _, shadowComment := range result.Shadow.Comments {
+		comm := Comment{}
+		comm = shadowComment.Comment
+		comm.BugWhen = shadowComment.BugWhen.Time
+		bug.Comments = append(bug.Comments, &comm)
 	}
 
 	return &bug, nil
 }
 
-func (c *Client) PatchBug(source string) string {
+func (c *Client) patchBug(source string) string {
 	r := regexp.MustCompile("(?s:<flag (.*?)/>)")
 	return r.ReplaceAllString(source, "<flag $1></flag>")
 }
 
+func (c *Client) cacheBug(bug *Bug) {
+	cacher, ok := c.cacher.(Cacher)
+	if !ok {
+		return
+	}
+	b, err := json.Marshal(bug)
+	if err == nil {
+		writer := cacher.GetWriter(fmt.Sprintf("%d", bug.BugID))
+		writer.Write(b)
+		writer.Close()
+	}
+}
+
+// GetBug gets a *Bug from the Bugzilla API (apibuzilla)
 func (c *Client) GetBug(id int) (*Bug, error) {
 	// query.Set("ctype", "xml")
 	// query.Set("excludefield", "attachmentdata")
@@ -301,15 +361,19 @@ func (c *Client) GetBug(id int) (*Bug, error) {
 		return nil, ConnectionError{err}
 	}
 
-	patched := c.PatchBug(string(body))
+	patched := c.patchBug(string(body))
 
 	bug, err := c.decodeBug([]byte(patched))
+
+	c.cacheBug(bug)
+
 	return bug, err
 }
 
-type BugzillaError struct{ error }
+// ErrBugzilla is an error from Bugzilla
+type ErrBugzilla struct{ error }
 
-func (e BugzillaError) Error() string {
+func (e ErrBugzilla) Error() string {
 	return fmt.Sprintf("Error from Bugzilla: %v", e.error)
 }
 
@@ -317,14 +381,14 @@ func (c *Client) inspectBugzillaResponse() (err error) {
 	dom := c.browser.Dom()
 	html, err := dom.Html()
 	if err != nil {
-		return BugzillaError{fmt.Errorf("could not fetch the HTML response from bugzilla: %v", err)}
+		return ErrBugzilla{fmt.Errorf("could not fetch the HTML response from bugzilla: %v", err)}
 	}
 
 	if strings.Contains(html, "Mid-air collision!") {
-		return BugzillaError{fmt.Errorf("Mid-air collision!")}
+		return ErrBugzilla{fmt.Errorf("mid-air collision")}
 	}
 	if strings.Contains(html, "reason=invalid_token") {
-		return BugzillaError{fmt.Errorf("Invalid token! (Ask the developers!)")}
+		return ErrBugzilla{fmt.Errorf("invalid token! (Ask the developers!)")}
 	}
 	if !strings.Contains(html, "Changes submitted for") {
 		messages := make([]string, 0)
@@ -338,13 +402,13 @@ func (c *Client) inspectBugzillaResponse() (err error) {
 			messages = append(messages, text)
 		})
 		if len(messages) == 0 {
-			return BugzillaError{fmt.Errorf("Unknown error while submitting the form")}
+			return ErrBugzilla{fmt.Errorf("Unknown error while submitting the form")}
 		}
 		joined := strings.Join(messages, "; ")
 		if strings.Contains(joined, "Match Failed;") {
-			return BugzillaError{fmt.Errorf("Bugzilla was unable to make any match at all for one or more of the names and/or email addresses")}
+			return ErrBugzilla{fmt.Errorf("Bugzilla was unable to make any match at all for one or more of the names and/or email addresses")}
 		}
-		return BugzillaError{fmt.Errorf("Message: %s", joined)}
+		return ErrBugzilla{fmt.Errorf("Message: %s", joined)}
 	}
 	return
 }
@@ -379,12 +443,14 @@ func (c *Client) findClearNeedinfoFor(email string) (controlName string, err err
 		})
 	})
 	if !found {
-		err = BugzillaError{fmt.Errorf("no control found for the email %v", email)}
+		err = ErrBugzilla{fmt.Errorf("no control found for the email %v", email)}
 		return
 	}
 	return
 }
 
+// PriorityMap maps short priority names to the longer ones, as provided by
+// the Web Interface
 var PriorityMap = map[string]string{
 	"P0": "P0 - Crit Sit",
 	"P1": "P1 - Urgent",
@@ -418,6 +484,8 @@ type Changes struct {
 	CcMyself bool
 }
 
+// Update changes a bug with the attribute to be modified provided by
+// Changes
 func (c *Client) Update(id int, changes Changes) (err error) {
 	url, err := c.getShowBugURL(id, nil)
 	if err != nil {
@@ -426,7 +494,7 @@ func (c *Client) Update(id int, changes Changes) (err error) {
 	c.browser.Open(url)
 	form, err := c.browser.Form("form[name=changeform]")
 	if err != nil {
-		return BugzillaError{fmt.Errorf("failed to find the form element in the bug html: %v", err)}
+		return ErrBugzilla{fmt.Errorf("failed to find the form element in the bug html: %v", err)}
 	}
 	if changes.SetNeedinfo != "" {
 		form.Set("needinfo", "1")
@@ -466,7 +534,7 @@ func (c *Client) Update(id int, changes Changes) (err error) {
 	if changes.SetPriority != "" {
 		prio, ok := PriorityMap[changes.SetPriority]
 		if !ok {
-			return BugzillaError{fmt.Errorf("invalid priority value: %v", changes.SetPriority)}
+			return ErrBugzilla{fmt.Errorf("invalid priority value: %v", changes.SetPriority)}
 		}
 		form.Set("priority", prio)
 	}
@@ -494,8 +562,48 @@ func (c *Client) Update(id int, changes Changes) (err error) {
 	}
 	err = form.Submit()
 	if err != nil {
-		return BugzillaError{fmt.Errorf("failed to send a request to bugzilla: %v", err)}
+		return ErrBugzilla{fmt.Errorf("failed to send a request to bugzilla: %v", err)}
 	}
 	err = c.inspectBugzillaResponse()
 	return
+}
+
+func getAttachmentFromHeaders(id int, header http.Header) (*Attachment, error) {
+	rawType := header.Get("Content-Disposition")
+	_, info, err := mime.ParseMediaType(rawType)
+	if err != nil {
+		return nil, ConnectionError{fmt.Errorf("failed to parse Content-Disposition: %v", err)}
+	}
+
+	size, err := strconv.Atoi(header.Get("Content-Length"))
+	if err != nil {
+		return nil, ConnectionError{fmt.Errorf("bad Content-Length in response")}
+	}
+
+	name, _ := info["filename"]
+	att := &Attachment{AttachID: id, Filename: name, Size: size}
+
+	return att, nil
+}
+
+// DownloadAttachment an attachment for download
+// Returns an Attachment with only the Size and Filename filled, a reader
+// and error.
+func (c *Client) DownloadAttachment(id int) (*Attachment, io.ReadCloser, error) {
+	url, err := c.getDownloadURL(id)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	resp, err := c.seriousClient.Get(url)
+	if err != nil {
+		return nil, nil, ConnectionError{err}
+	}
+
+	att, err := getAttachmentFromHeaders(id, resp.Header)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return att, resp.Body, nil
 }

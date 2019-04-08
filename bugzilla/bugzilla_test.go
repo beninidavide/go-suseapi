@@ -1,9 +1,9 @@
 package bugzilla_test
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
-	"github.com/bhdn/go-suseapi/bugzilla"
-	. "gopkg.in/check.v1"
 	"io"
 	_ "log"
 	"net/http"
@@ -13,6 +13,9 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/bhdn/golang-l3t/bugzilla"
+	. "gopkg.in/check.v1"
 )
 
 type clientSuite struct {
@@ -211,7 +214,7 @@ func (cs *clientSuite) TestGetBug(c *C) {
 	bug, err := bz.GetBug(1047068)
 	c.Assert(err, IsNil)
 	c.Assert(bug, NotNil)
-	c.Assert(bug.BugId, Equals, 1047068)
+	c.Assert(bug.BugID, Equals, 1047068)
 	c.Assert(bug.ShortDesc, Equals, "L4: test cloud bug")
 	c.Assert(bug.CreationTS, Equals, time.Date(2017, 7, 3, 13, 29, 0, 0, time.UTC))
 	c.Assert(bug.DeltaTS, Equals, time.Date(2019, 3, 27, 10, 45, 20, 0, time.UTC))
@@ -245,21 +248,21 @@ func (cs *clientSuite) TestGetBug(c *C) {
 	c.Assert(bug.QAContact.Name, Equals, "Firstname Lastname")
 	c.Assert(bug.Votes, Equals, 0)
 	c.Assert(len(bug.Groups), Equals, 2)
-	c.Assert(bug.Groups[0].Id, Equals, 10)
+	c.Assert(bug.Groups[0].ID, Equals, 10)
 	c.Assert(bug.Groups[0].Name, Equals, "foobaronly")
-	c.Assert(bug.Groups[1].Id, Equals, 17)
+	c.Assert(bug.Groups[1].ID, Equals, 17)
 	c.Assert(bug.Groups[1].Name, Equals, "foobar Enterprise Partner")
 	c.Assert(bug.CommentSortOrder, Equals, "oldest_to_newest")
 	c.Assert(len(bug.Comments), Equals, 4)
-	c.Assert(bug.Comments[0].Id, Equals, 7315202)
+	c.Assert(bug.Comments[0].ID, Equals, 7315202)
 	c.Assert(bug.Comments[0].IsPrivate, Equals, 0)
 	c.Assert(bug.Comments[0].Count, Equals, 0)
 	c.Assert(bug.Comments[0].BugWhen, Equals, time.Date(2017, 07, 03, 13, 29, 15, 0, time.UTC))
 	c.Assert(bug.Comments[0].Who.Name, Equals, "Firstname Lastname")
 	c.Assert(bug.Comments[0].Who.Email, Equals, "username@foobar.com")
 	c.Assert(bug.Comments[0].TheText, Equals, "This is a test cloud incident.")
-	c.Assert(bug.Comments[1].Id, Equals, 7986182)
-	c.Assert(bug.Comments[0].IsPrivate, Equals, 0)
+	c.Assert(bug.Comments[1].ID, Equals, 7986182)
+	c.Assert(bug.Comments[1].IsPrivate, Equals, 0)
 	c.Assert(bug.Comments[1].Count, Equals, 57)
 	c.Assert(bug.Comments[1].Who.Name, Equals, "Firstname Lastname")
 	c.Assert(bug.Comments[1].Who.Email, Equals, "username@foobar.com")
@@ -267,7 +270,7 @@ func (cs *clientSuite) TestGetBug(c *C) {
 > test file comment with -r
 
 skldjskdj`)
-	c.Assert(bug.Comments[2].Id, Equals, 7986183)
+	c.Assert(bug.Comments[2].ID, Equals, 7986183)
 	c.Assert(bug.Comments[2].IsPrivate, Equals, 0)
 	c.Assert(bug.Comments[2].Count, Equals, 58)
 	c.Assert(bug.Comments[2].Who.Name, Equals, "Firstname Lastname")
@@ -275,20 +278,20 @@ skldjskdj`)
 	c.Assert(bug.Comments[2].TheText, Equals, "comment")
 	c.Assert(len(bug.Flags), Equals, 3)
 	c.Assert(bug.Flags[0].Name, Equals, "needinfo")
-	c.Assert(bug.Flags[0].Id, Equals, 201661)
-	c.Assert(bug.Flags[0].TypeId, Equals, 4)
+	c.Assert(bug.Flags[0].ID, Equals, 201661)
+	c.Assert(bug.Flags[0].TypeID, Equals, 4)
 	c.Assert(bug.Flags[0].Status, Equals, "?")
 	c.Assert(bug.Flags[0].Setter, Equals, "username@foobar.com")
 	c.Assert(bug.Flags[0].Requestee, Equals, "username@foobar.com")
 	c.Assert(bug.Flags[1].Name, Equals, "needinfo")
-	c.Assert(bug.Flags[1].Id, Equals, 201662)
-	c.Assert(bug.Flags[1].TypeId, Equals, 4)
+	c.Assert(bug.Flags[1].ID, Equals, 201662)
+	c.Assert(bug.Flags[1].TypeID, Equals, 4)
 	c.Assert(bug.Flags[1].Status, Equals, "?")
 	c.Assert(bug.Flags[1].Setter, Equals, "username@foobar.com")
 	c.Assert(bug.Flags[1].Requestee, Equals, "username@foobar.com")
 	c.Assert(bug.Flags[2].Name, Equals, "SHIP_STOPPER")
-	c.Assert(bug.Flags[2].Id, Equals, 201663)
-	c.Assert(bug.Flags[2].TypeId, Equals, 2)
+	c.Assert(bug.Flags[2].ID, Equals, 201663)
+	c.Assert(bug.Flags[2].TypeID, Equals, 2)
 	c.Assert(bug.Flags[2].Status, Equals, "?")
 	c.Assert(bug.Flags[2].Setter, Equals, "username@foobar.com")
 	c.Assert(bug.Flags[2].Requestee, Equals, "username@foobar.com")
@@ -303,6 +306,68 @@ skldjskdj`)
 	c.Assert(bug.Attachments[1].IsPatch, Equals, 0)
 	c.Assert(bug.Attachments[1].Date, Equals, time.Date(2018, 4, 6, 12, 50, 0, 0, time.UTC))
 	c.Assert(bug.Attachments[1].Filename, Equals, "a.txt")
+}
+
+func makeClientWithCache(url string, cacher bugzilla.Cacher) *bugzilla.Client {
+	config := bugzilla.Config{BaseURL: url,
+		User: "me", Password: "letmein", Cacher: cacher}
+	bz, _ := bugzilla.New(config)
+	return bz
+}
+
+type CacherHelper struct {
+	bugzilla.Cacher
+
+	location string
+	buf      FakeBuf
+	id       string
+}
+
+type FakeBuf struct {
+	bytes.Buffer
+}
+
+func (f *FakeBuf) Close() error {
+	return nil
+}
+
+func (c *CacherHelper) GetWriter(id string) io.WriteCloser {
+	c.id = id
+	return &c.buf
+}
+
+type cacheChecker struct {
+	BugID      int            `json:"bug_id"`
+	ShortDesc  string         `json:"short_desc"`
+	AssignedTo *bugzilla.User `json:"assigned_to"`
+}
+
+func (cs *clientSuite) TestGetBugWithCacher(c *C) {
+	ts0 := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/show_bug.cgi":
+			query := r.URL.Query()
+			c.Assert(query.Get("id"), Equals, "1047068")
+			io.WriteString(w, bugXml)
+		default:
+			http.Error(w, "Unimplemented", 500)
+			return
+		}
+	}))
+	defer ts0.Close()
+
+	var cacher CacherHelper
+	bz := makeClientWithCache(ts0.URL, &cacher)
+	bug, err := bz.GetBug(1047068)
+	c.Assert(err, IsNil)
+	c.Assert(cacher.id, Equals, "1047068")
+	c.Assert(bug.BugID, Equals, 1047068)
+	var checker cacheChecker
+	err = json.Unmarshal(cacher.buf.Bytes(), &checker)
+	c.Assert(err, IsNil)
+	c.Check(checker.BugID, Equals, 1047068)
+	c.Check(checker.ShortDesc, Equals, "L4: test cloud bug")
+	c.Check(checker.AssignedTo.Name, Equals, "Firstname Lastname")
 }
 
 var showBugHtml = `
@@ -486,7 +551,7 @@ var showBugHtml = `
       <span id="static_bug_status">RESOLVED
           FIXED
           (<a href="#add_comment" 
-              onclick="window.setTimeout(function() { document.getElementById('bug_status').focus(); }, 10)">edit</a>)
+              onclick="window.setTimeout(function() { document.getElementByID('bug_status').focus(); }, 10)">edit</a>)
       </span>
     </td>
   </tr>
@@ -1958,11 +2023,11 @@ comment and reply -- reply takes priority</pre>
           cols="80"
             onFocus="this.rows=25"></textarea>
             <script>
-               updateCommentTagControl(document.getElementById('newcommentprivacy'), 'comment');
+               updateCommentTagControl(document.getElementByID('newcommentprivacy'), 'comment');
             </script><div id="needinfo_container">
       
       <script>
-        var summary_container = document.getElementById('static_bug_status');
+        var summary_container = document.getElementByID('static_bug_status');
         summary_container.appendChild(document.createTextNode('[NEEDINFO]'));
       </script>
     <table>
@@ -2167,7 +2232,7 @@ EXTRANEEDINFO-->
     <input type="hidden" id="no_redirect_bottom" name="no_redirect" value="0">
     <script type="text/javascript">
       if (history && history.replaceState) {
-        var no_redirect = document.getElementById("no_redirect_bottom");
+        var no_redirect = document.getElementByID("no_redirect_bottom");
         no_redirect.value = 1;
       }
     </script>
@@ -2220,8 +2285,8 @@ var changesSubmitted = `
   </dd>
 <dt>Excluding:</dt>
   <dd>
-        <code>deuser@gmail.com</code>,
-        <code>user@foobar.com</code>
+        <code>debogdano@gmail.com</code>,
+        <code>BArendartchuk@suse.com</code>
   </dd>
 </dl>
 </body></html>
