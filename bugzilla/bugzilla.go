@@ -364,8 +364,9 @@ func (c *Client) GetBug(id int) (*Bug, error) {
 	patched := c.patchBug(string(body))
 
 	bug, err := c.decodeBug([]byte(patched))
-
-	c.cacheBug(bug)
+	if err == nil {
+		c.cacheBug(bug)
+	}
 
 	return bug, err
 }
