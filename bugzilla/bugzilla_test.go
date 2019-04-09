@@ -2507,3 +2507,33 @@ func (cs *clientSuite) TestUnauthorized(c *C) {
 	c.Assert(bug, IsNil)
 	c.Assert(err, ErrorMatches, ".*Unauthorized*")
 }
+
+var sampleError = `
+<?xml version="1.0" encoding="UTF-8" standalone="yes" ?>
+<!DOCTYPE bugzilla SYSTEM "http://bugzilla.foobar.com/page.cgi?id=bugzilla.dtd">
+
+<bugzilla version="4.4.12"
+          urlbase="http://bugzilla.foobar.com/"
+
+          maintainer="novbugzilla-dev@forge.provo.foobar.com"
+>
+
+    <bug error="NotPermitted">
+      <bug_id>1047068</bug_id>
+    </bug>
+
+</bugzilla>
+`
+
+// TestGetBugNotPermitted triggers the code path when a request is made to
+// the wrong endpoint of Bugzilla (one that uses another type of auth)
+func (cs *clientSuite) TestGetBugNotPermitted(c *C) {
+	ts0 := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Error(w, sampleError, http.StatusOK)
+	}))
+	defer ts0.Close()
+	bz := makeClient(ts0.URL)
+	bug, err := bz.GetBug(1047068)
+	c.Assert(bug, IsNil)
+	c.Assert(err, ErrorMatches, ".*NotPermitted*")
+}

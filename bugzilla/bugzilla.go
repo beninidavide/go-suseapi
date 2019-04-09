@@ -225,6 +225,8 @@ type Bug struct {
 }
 
 type shadowBug struct {
+	Error string `xml:"error,attr"`
+
 	Bug
 	CreationTS  bzTime             `xml:"creation_ts" json:"creation_ts"` // 2017-07-03 13:29:00 +0000
 	DeltaTS     bzTime             `xml:"delta_ts" json:"delta_ts"`       // 2019-03-27 10:45:20 +0000
@@ -296,6 +298,10 @@ func (c *Client) decodeBug(data []byte) (*Bug, error) {
 	err := xml.Unmarshal(data, &result)
 	if err != nil {
 		return nil, ConnectionError{err}
+	}
+
+	if result.Shadow.Error != "" {
+		return nil, ConnectionError{fmt.Errorf("code: %s", result.Shadow.Error)}
 	}
 
 	var bug Bug
