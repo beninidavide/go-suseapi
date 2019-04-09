@@ -2268,8 +2268,8 @@ var changesSubmitted = `
   </dd>
 <dt>Excluding:</dt>
   <dd>
-        <code>debogdano@gmail.com</code>,
-        <code>BArendartchuk@suse.com</code>
+        <codeuser@gmail.com</code>,
+        <code>user@foobar.com</code>
   </dd>
 </dl>
 </body></html>
