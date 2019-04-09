@@ -2496,3 +2496,14 @@ func (cs *clientSuite) TestUpdateNeedinfo(c *C) {
 	query = <-queries
 	c.Assert(query.Get("dup_id"), Equals, fmt.Sprintf("%d", duplicate))
 }
+
+func (cs *clientSuite) TestUnauthorized(c *C) {
+	ts0 := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+	}))
+	defer ts0.Close()
+	bz := makeClient(ts0.URL)
+	bug, err := bz.GetBug(1047068)
+	c.Assert(bug, IsNil)
+	c.Assert(err, ErrorMatches, ".*Unauthorized*")
+}
