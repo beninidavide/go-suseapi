@@ -355,6 +355,10 @@ func (c *Client) GetBug(id int) (*Bug, error) {
 	defer resp.Body.Close()
 	defer io.Copy(ioutil.Discard, resp.Body)
 
+	if !(resp.StatusCode >= 200 && resp.StatusCode <= 299) {
+		return nil, ConnectionError{fmt.Errorf(http.StatusText(resp.StatusCode))}
+	}
+
 	limitedReader := &io.LimitedReader{R: resp.Body, N: 10 * 1024 * 1024}
 	body, err := ioutil.ReadAll(limitedReader)
 	if err != nil {
