@@ -442,23 +442,6 @@ var showBugHtml = `
           <li><a href="https://bugzilla.foobar.com/AGLogout">Log out</a></li>
       </ul>
     </li>
-
-    <li class="dropdown">
-      <span class="anchor">My Saved Searches</span>
-      <ul>
-          <li><a href="buglist.cgi?resolution=---&amp;emailassigned_to1=1&amp;emailtype1=exact&amp;email1=user%40foobar.com">My Bugs</a></li>
-          <li><a href="buglist.cgi?bug_status=NEW&amp;bug_status=CONFIRMED&amp;bug_status=IN_PROGRESS&amp;bug_status=REOPENED&amp;email1=user%40foobar.com&amp;emailtype1=exact&amp;emailreporter1=1">My Reports</a></li>
-          <li>
-            <a href="buglist.cgi?cmdtype=runnamed&amp;namedcmd=my%20actual%20bugs">my actual bugs</a>
-          </li>
-          <li>
-            <a href="buglist.cgi?cmdtype=runnamed&amp;namedcmd=ptfututils">ptfututils</a>
-          </li>
-          <li>
-            <a href="buglist.cgi?cmdtype=runnamed&amp;namedcmd=trellloless">trellloless</a>
-          </li>
-      </ul>
-    </li>
 <li>
         <span class="separator">| </span>
         <a href="docs/en/html/bug_page.html" target="_blank">Help</a>
