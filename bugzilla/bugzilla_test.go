@@ -14,7 +14,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/bhdn/golang-l3t/bugzilla"
+	"github.com/bhdn/go-suseapi/bugzilla"
 	. "gopkg.in/check.v1"
 )
 
