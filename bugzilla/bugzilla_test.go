@@ -2495,6 +2495,21 @@ func (cs *clientSuite) TestUpdateNeedinfo(c *C) {
 	c.Assert(err, IsNil)
 	query = <-queries
 	c.Assert(query.Get("dup_id"), Equals, fmt.Sprintf("%d", duplicate))
+
+	delta := time.Date(2019, 01, 01, 01, 02, 03, 0, time.UTC)
+	changes = bugzilla.Changes{AddComment: "Some comment", DeltaTS: delta, CheckDeltaTS: true}
+	showBug <- showBugHtml
+	processBug <- changesSubmitted
+	err = bz.Update(101234, changes)
+	c.Assert(err, NotNil)
+	c.Assert(err, ErrorMatches, ".*collision.*")
+
+	delta = time.Date(2019, 03, 28, 11, 40, 39, 0, time.UTC)
+	changes = bugzilla.Changes{AddComment: "Some comment", DeltaTS: delta, CheckDeltaTS: true}
+	showBug <- showBugHtml
+	processBug <- changesSubmitted
+	err = bz.Update(101234, changes)
+	c.Assert(err, IsNil)
 }
 
 func (cs *clientSuite) TestUnauthorized(c *C) {

@@ -493,6 +493,39 @@ type Changes struct {
 	AddCc    string
 	RemoveCc string
 	CcMyself bool
+
+	// DeltaTS should have the timestamp of the last change
+	DeltaTS      time.Time
+	CheckDeltaTS bool
+}
+
+func getDeltaTS(form browser.Submittable) (t *time.Time, err error) {
+	raw, err := form.Value("delta_ts")
+	if err != nil {
+		return nil, ErrBugzilla{fmt.Errorf("can't detect mid-air collision without delta_ts in the bug form: %v", err)}
+	}
+	raw += " +0000" // this is a workaround against a bad delta_ts sent by the web interface
+	var delta bzTime
+	err = delta.UnmarshalText([]byte(raw))
+	if err != nil {
+		return nil, ErrBugzilla{fmt.Errorf("failed to parse delta_ts to prevent mid-air collision")}
+	}
+	t = &delta.Time
+	return
+}
+
+func (c *Client) checkDeltaTS(changes *Changes, form browser.Submittable) error {
+	if changes.CheckDeltaTS {
+		delta, err := getDeltaTS(form)
+		if err != nil {
+			return err
+		}
+
+		if !delta.Equal(changes.DeltaTS) {
+			return ErrBugzilla{fmt.Errorf("likely mid-air collision: the bug has been updated at %v", delta)}
+		}
+	}
+	return nil
 }
 
 // Update changes a bug with the attribute to be modified provided by
@@ -506,6 +539,9 @@ func (c *Client) Update(id int, changes Changes) (err error) {
 	form, err := c.browser.Form("form[name=changeform]")
 	if err != nil {
 		return ErrBugzilla{fmt.Errorf("failed to find the form element in the bug html: %v", err)}
+	}
+	if err = c.checkDeltaTS(&changes, form); err != nil {
+		return err
 	}
 	if changes.SetNeedinfo != "" {
 		form.Set("needinfo", "1")
