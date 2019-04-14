@@ -915,8 +915,8 @@ var showBugHtml = `
     </tr>
     <script type="text/javascript">
       assignToDefaultOnChange(['product', 'component'],
-        'cloud-bugs\x40foobar.de',
-        'cloud-bugs\x40foobar.de');
+        'cloud-bugs\x40foobar.com',
+        'cloud-bugs\x40foobar.com');
     </script>
           <tr>
     <td colspan="2" class="bz_section_spacer"></td>
@@ -1828,7 +1828,7 @@ bug being identified as a ship stopper"
         </span>
 
         <span class="bz_comment_user">
-          <span class="vcard"><a class="email" href="mailto:l3-coord&#64;foobar.de" title="ZZ treta Coordination &lt;l3-coord&#64;foobar.de&gt;"> <span class="fn">ZZ treta Coordination</span></a>
+          <span class="vcard"><a class="email" href="mailto:supporters&#64;foobar.com" title="ZZ treta Coordination &lt;supporters&#64;foobar.com&gt;"> <span class="fn">ZZ treta Coordination</span></a>
 </span>
         </span>
 
@@ -1957,7 +1957,7 @@ comment and reply -- reply takes priority</pre>
         </span>
 
         <span class="bz_comment_user">
-          <span class="vcard"><a class="email" href="mailto:l3-coord&#64;foobar.de" title="ZZ treta Coordination &lt;l3-coord&#64;foobar.de&gt;"> <span class="fn">ZZ treta Coordination</span></a>
+          <span class="vcard"><a class="email" href="mailto:supporters&#64;foobar.com" title="ZZ treta Coordination &lt;supporters&#64;foobar.com&gt;"> <span class="fn">ZZ treta Coordination</span></a>
 </span>
         </span>
 
@@ -2536,4 +2536,169 @@ func (cs *clientSuite) TestGetBugNotPermitted(c *C) {
 	bug, err := bz.GetBug(1047068)
 	c.Assert(bug, IsNil)
 	c.Assert(err, ErrorMatches, ".*NotPermitted*")
+}
+
+var sampleJSON = `
+
+{
+   "version" : "GMC",
+   "short_desc" : "Bug short_desc here",
+   "cf_nts_priority" : [
+      "",
+      ""
+   ],
+   "bug_severity" : "Major",
+   "status_whiteboard" : "openTreta:1234",
+   "cclist_accessible" : 1,
+   "remaining_time" : "0.00",
+   "Comments" : [
+      {
+         "thetext" : "Some comment",
+         "comment_count" : 0,
+         "who" : {
+            "email" : "username@foobar.com",
+            "name" : "Firstname Lastname"
+         },
+         "commentid" : 8082652,
+         "BugWhen" : "2019-03-20T19:48:42Z",
+         "isprivate" : 0
+      },
+      {
+         "comment_count" : 1,
+         "thetext" : "Second comment",
+         "who" : {
+            "email" : "user@foobar.com",
+            "name" : "Firstname Lastname"
+         },
+         "isprivate" : 1,
+         "BugWhen" : "2019-03-20T20:04:54Z",
+         "commentid" : 8082662
+      },
+      {
+         "comment_count" : 2,
+         "thetext" : "Third comment.",
+         "who" : {
+            "name" : "Firstname Lastname",
+            "email" : "user@foobar.com"
+         },
+         "isprivate" : 0,
+         "BugWhen" : "2019-03-20T20:05:48Z",
+         "commentid" : 8082664
+      }
+   ],
+   "actual_time" : "0.00",
+   "CreationTS" : "2019-03-20T19:48:00Z",
+   "estimated_time" : "0.00",
+   "cc" : [
+      "lfirstname@foobar.com",
+      "user@foobar.com"
+   ],
+   "component" : "Core",
+   "op_sys" : "FROB 12",
+   "rep_platform" : "x86-64",
+   "cf_it_deployment" : [
+      "---"
+   ],
+   "DeltaTS" : "2019-04-13T13:08:58Z",
+   "bug_id" : 1129974,
+   "assigned_to" : {
+      "email" : "user@foobar.com",
+      "name" : "Firstname Lastname"
+   },
+   "resolution" : "",
+   "classification_id" : 27,
+   "everconfirmed" : 1,
+   "reporter_accessible" : 1,
+   "target_milestone" : "---",
+   "comment_sort_order" : "oldest_to_newest",
+   "cf_blocker" : [
+      "---"
+   ],
+   "cf_foundby" : [
+      "---",
+      "---"
+   ],
+   "bug_status" : "IN_PROGRESS",
+   "group" : [
+      {
+         "id" : 10,
+         "email" : "foobaronly"
+      },
+      {
+         "id" : 17,
+         "email" : "Foo Bar Enterprise"
+      }
+   ],
+   "reporter" : {
+      "email" : "user@foobar.com",
+      "name" : "Firstname Lastname"
+   },
+   "classification" : "Frobnicator Plus",
+   "cf_biz_priority" : [
+      "",
+      ""
+   ],
+   "dup_id" : 0,
+   "priority" : "P2 - High",
+   "product" : "Frobnicator Plus",
+   "token" : [
+      "1234555-i2XdlR-90bqTkLrFRr8nC6YbAG1xDNlSktCEp9r3Ux4"
+   ],
+   "votes" : 0,
+   "Attachments" : [
+      {
+         "filename" : "dump.tbz",
+         "attacher" : {
+            "name" : "Firstname Lastname",
+            "email" : "user@foobar.com"
+         },
+         "isobsolete" : 0,
+         "DeltaTS" : "2019-03-20T20:07:16Z",
+         "isprivate" : 0,
+         "desc" : "the dump",
+         "ispatch" : 0,
+         "Date" : "2019-03-20T20:07:00Z",
+         "type" : "application/x-bzip",
+         "token" : "123455555-Y0xsvTLjEFWr3pKrKjnPCsjNupLWQ1SGK7utZkCFqeU",
+         "size" : 6014076,
+         "attachid" : 800750
+      }
+   ],
+   "qa_contact" : {
+      "name" : "E-mail List",
+      "email" : "qa-contact@foobar.com"
+   },
+   "keywords" : "DSLA_REQUIRED",
+   "bug_file_loc" : "",
+   "flag" : [
+      {
+         "id" : 201207,
+         "status" : "?",
+         "type_id" : 4,
+         "name" : "needinfo",
+         "requestee" : "user@foobar.com",
+         "setter" : "supporter@foobar.com"
+      }
+   ]
+}
+`
+
+func (cs *clientSuite) TestGetFromJSON(c *C) {
+	ts0 := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Error(w, sampleError, http.StatusOK)
+	}))
+	defer ts0.Close()
+	bz := makeClient(ts0.URL)
+	bug, err := bz.GetBugFromJSON([]byte(sampleJSON))
+	c.Assert(err, IsNil)
+	c.Assert(bug, NotNil)
+	c.Check(bug.ShortDesc, Equals, "Bug short_desc here")
+	c.Check(bug.AssignedTo.Name, Equals, "Firstname Lastname")
+	c.Check(bug.BugSeverity, Equals, "Major")
+	c.Check(bug.StatusWhiteboard, Equals, "openTreta:1234")
+	c.Check(len(bug.Comments), Equals, 3)
+	c.Check(bug.Comments[0].TheText, Equals, "Some comment")
+	c.Check(bug.Comments[0].BugWhen, Equals, time.Date(2019, 03, 20, 19, 48, 42, 0, time.UTC))
+	c.Check(bug.CreationTS, Equals, time.Date(2019, 03, 20, 19, 48, 0, 0, time.UTC))
+	c.Check(bug.Cc, DeepEquals, []string{"lfirstname@foobar.com", "user@foobar.com"})
 }
