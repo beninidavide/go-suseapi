@@ -2689,7 +2689,7 @@ func (cs *clientSuite) TestGetFromJSON(c *C) {
 	}))
 	defer ts0.Close()
 	bz := makeClient(ts0.URL)
-	bug, err := bz.GetBugFromJSON([]byte(sampleJSON))
+	bug, err := bz.GetBugFromJSON(strings.NewReader(sampleJSON))
 	c.Assert(err, IsNil)
 	c.Assert(bug, NotNil)
 	c.Check(bug.ShortDesc, Equals, "Bug short_desc here")

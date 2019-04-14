@@ -620,9 +620,10 @@ func (c *Client) DownloadAttachment(id int) (*Attachment, io.ReadCloser, error) 
 }
 
 // GetBug gets a *Bug from a JSON blob
-func (c *Client) GetBugFromJSON(raw []byte) (*Bug, error) {
+func (c *Client) GetBugFromJSON(source io.Reader) (*Bug, error) {
 	var bug Bug
-	err := json.Unmarshal(raw, &bug)
+	decoder := json.NewDecoder(source)
+	err := decoder.Decode(&bug)
 	if err != nil {
 		return nil, err
 	}
