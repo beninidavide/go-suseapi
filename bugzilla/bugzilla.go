@@ -177,10 +177,10 @@ type Bug struct {
 
 	Groups []Group `xml:"group" json:"group"`
 
-	BugID              int       `xml:"bug_id" json:"bug_id"` // 1047068
-	CreationTS         time.Time // 2017-07-03 13:29:00 +0000
-	ShortDesc          string    `xml:"short_desc" json:"short_desc"` // L4: test cloud bug
-	DeltaTS            time.Time // 2019-03-27 10:45:20 +0000
+	BugID              int       `xml:"bug_id" json:"bug_id"`                           // 1047068
+	CreationTS         time.Time `json:"creation_ts"`                                   // 2017-07-03 13:29:00 +0000
+	ShortDesc          string    `xml:"short_desc" json:"short_desc"`                   // L4: test cloud bug
+	DeltaTS            time.Time `json:"delta_ts"`                                      // 2019-03-27 10:45:20 +0000
 	ReporterAccessible int       `xml:"reporter_accessible" json:"reporter_accessible"` // 0
 	CCListAccessible   int       `xml:"cclist_accessible" json:"cclist_accessible"`     // 0
 	ClassificationID   int       `xml:"classification_id" json:"classification_id"`     // 111

@@ -2587,7 +2587,7 @@ var sampleJSON = `
       }
    ],
    "actual_time" : "0.00",
-   "CreationTS" : "2019-03-20T19:48:00Z",
+   "creation_ts" : "2019-03-20T19:48:00Z",
    "estimated_time" : "0.00",
    "cc" : [
       "lfirstname@foobar.com",
@@ -2599,7 +2599,7 @@ var sampleJSON = `
    "cf_it_deployment" : [
       "---"
    ],
-   "DeltaTS" : "2019-04-13T13:08:58Z",
+   "delta_ts" : "2019-04-13T13:08:58Z",
    "bug_id" : 1129974,
    "assigned_to" : {
       "email" : "user@foobar.com",
@@ -2653,7 +2653,7 @@ var sampleJSON = `
             "email" : "user@foobar.com"
          },
          "isobsolete" : 0,
-         "DeltaTS" : "2019-03-20T20:07:16Z",
+         "delta_ts" : "2019-03-20T20:07:16Z",
          "isprivate" : 0,
          "desc" : "the dump",
          "ispatch" : 0,
