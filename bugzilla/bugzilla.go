@@ -327,9 +327,9 @@ func (c *Client) decodeBug(data []byte) (*Bug, error) {
 	return &bug, nil
 }
 
-func (c *Client) patchBug(source string) string {
+func (c *Client) patchBug(source []byte) []byte {
 	r := regexp.MustCompile("(?s:<flag (.*?)/>)")
-	return r.ReplaceAllString(source, "<flag $1></flag>")
+	return r.ReplaceAll(source, []byte("<flag $1></flag>"))
 }
 
 func (c *Client) cacheBug(bug *Bug) {
@@ -371,9 +371,9 @@ func (c *Client) GetBug(id int) (*Bug, error) {
 		return nil, ConnectionError{err}
 	}
 
-	patched := c.patchBug(string(body))
+	patched := c.patchBug(body)
 
-	bug, err := c.decodeBug([]byte(patched))
+	bug, err := c.decodeBug(patched)
 	if err == nil {
 		c.cacheBug(bug)
 	}

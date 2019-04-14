@@ -44,7 +44,7 @@ func (cs *clientSuite) TestCreateClient(c *C) {
 
 func (cs *clientSuite) TestPatchBug(c *C) {
 	bz := makeClient("")
-	c.Assert(bz.PatchBug("<flag foo=bar\n />"), Equals, "<flag foo=bar\n ></flag>")
+	c.Assert(string(bz.PatchBug([]byte("<flag foo=bar\n />"))), Equals, "<flag foo=bar\n ></flag>")
 }
 
 const bugXml = `
