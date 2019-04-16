@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	_ "log"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -306,6 +305,29 @@ skldjskdj`)
 	c.Assert(bug.Attachments[1].IsPatch, Equals, 0)
 	c.Assert(bug.Attachments[1].Date, Equals, time.Date(2018, 4, 6, 12, 50, 0, 0, time.UTC))
 	c.Assert(bug.Attachments[1].Filename, Equals, "a.txt")
+}
+
+func (cs *clientSuite) TestDifferentTZInBugzilla(c *C) {
+	xml := strings.Replace(bugXml, "+0000", "-0200", -1)
+	ts0 := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/show_bug.cgi":
+			query := r.URL.Query()
+			c.Assert(query.Get("id"), Equals, "1047068")
+			io.WriteString(w, xml)
+		default:
+			http.Error(w, "Unimplemented", 500)
+			return
+		}
+	}))
+	defer ts0.Close()
+
+	bz := makeClient(ts0.URL)
+	bug, err := bz.GetBug(1047068)
+	c.Assert(err, IsNil)
+	c.Assert(bug, NotNil)
+	c.Assert(bug.BugID, Equals, 1047068)
+	c.Assert(bug.CreationTS, Equals, time.Date(2017, 7, 3, 15, 29, 0, 0, time.UTC))
 }
 
 func makeClientWithCache(url string, cacher bugzilla.Cacher) *bugzilla.Client {

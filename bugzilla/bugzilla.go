@@ -285,11 +285,11 @@ type bzTime struct {
 }
 
 func (m *bzTime) UnmarshalText(p []byte) error {
-	t, err := time.Parse("2006-01-02 15:04:05 +0000", string(p))
+	t, err := time.Parse("2006-01-02 15:04:05 -0700", string(p))
 	if err != nil {
 		return err
 	}
-	m.Time = t
+	m.Time = t.UTC()
 	return nil
 }
 
