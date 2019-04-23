@@ -607,6 +607,13 @@ func (c *Client) Update(id int, changes Changes) (err error) {
 	if changes.SetDuplicate != 0 {
 		form.Set("dup_id", fmt.Sprintf("%d", changes.SetDuplicate))
 	}
+
+	// surf fails to parse cclist_accessible and reporter_accessible
+	// https://github.com/headzoo/surf/issues/109
+	form.Remove("defined_cclist_accessible")
+	form.Remove("defined_reporter_accessible")
+	form.Remove("defined_group")
+
 	err = form.Submit()
 	if err != nil {
 		return ErrBugzilla{fmt.Errorf("failed to send a request to bugzilla: %v", err)}
