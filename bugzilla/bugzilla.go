@@ -535,7 +535,10 @@ func (c *Client) Update(id int, changes Changes) (err error) {
 	if err != nil {
 		return
 	}
-	c.browser.Open(url)
+	err = c.browser.Open(url)
+	if err != nil {
+		return ErrBugzilla{fmt.Errorf("failed to get the update form: %v", err)}
+	}
 	form, err := c.browser.Form("form[name=changeform]")
 	if err != nil {
 		return ErrBugzilla{fmt.Errorf("failed to find the form element in the bug html: %v", err)}

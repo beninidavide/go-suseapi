@@ -2739,3 +2739,15 @@ func (cs *clientSuite) TestGetFromJSON(c *C) {
 	c.Check(bug.CreationTS, Equals, time.Date(2019, 03, 20, 19, 48, 0, 0, time.UTC))
 	c.Check(bug.Cc, DeepEquals, []string{"lfirstname@foobar.com", "user@foobar.com"})
 }
+
+func (cs *clientSuite) TestUpdateConnectionClosed(c *C) {
+	var ts0 *httptest.Server
+	ts0 = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ts0.CloseClientConnections()
+	}))
+	defer ts0.Close()
+	bz := makeClient(ts0.URL)
+	changes := bugzilla.Changes{AddComment: "Some comment"}
+	err := bz.Update(101234, changes)
+	c.Assert(err, ErrorMatches, ".*failed to get the update form.*")
+}
