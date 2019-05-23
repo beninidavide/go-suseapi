@@ -2721,11 +2721,7 @@ var sampleJSON = `
 `
 
 func (cs *clientSuite) TestGetFromJSON(c *C) {
-	ts0 := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		http.Error(w, sampleError, http.StatusOK)
-	}))
-	defer ts0.Close()
-	bz := makeClient(ts0.URL)
+	bz := makeClient("https://bugzilla.anythingworkshere.com")
 	bug, err := bz.GetBugFromJSON(strings.NewReader(sampleJSON))
 	c.Assert(err, IsNil)
 	c.Assert(bug, NotNil)
