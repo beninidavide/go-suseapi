@@ -2545,6 +2545,34 @@ func (cs *clientSuite) TestUnauthorized(c *C) {
 	c.Assert(err, ErrorMatches, ".*Unauthorized*")
 }
 
+var sampleHtmlError = `
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
+                      "http://www.w3.org/TR/html4/loose.dtd">
+<html lang="en">
+  <head>
+    <title>Invalid Username Or Password</title>
+
+      <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+
+  <body onload=""
+        class="bugzilla-suse-com yui-skin-sam">
+</body>
+</html>
+`
+
+// TestGetBugNotPermitted triggers the code path when a request is made to
+// the wrong endpoint of Bugzilla (one that uses another type of auth)
+func (cs *clientSuite) TestGetBugExpectedBugzilla(c *C) {
+	ts0 := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Error(w, sampleHtmlError, http.StatusOK)
+	}))
+	defer ts0.Close()
+	bz := makeClient(ts0.URL)
+	bug, err := bz.GetBug(1047068)
+	c.Assert(bug, IsNil)
+	c.Assert(err, ErrorMatches, ".*URL or credentials might be incorrect.*")
+}
+
 var sampleError = `
 <?xml version="1.0" encoding="UTF-8" standalone="yes" ?>
 <!DOCTYPE bugzilla SYSTEM "http://bugzilla.foobar.com/page.cgi?id=bugzilla.dtd">

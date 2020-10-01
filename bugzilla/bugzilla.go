@@ -297,6 +297,9 @@ func (c *Client) decodeBug(data []byte) (*Bug, error) {
 	var result xmlResult
 	err := xml.Unmarshal(data, &result)
 	if err != nil {
+		if strings.Contains(err.Error(), "expected element type <bugzilla> but have <html>") {
+			err = fmt.Errorf("Got redirected to an HTML page. The Bugzilla URL or credentials might be incorrect.")
+		}
 		return nil, ConnectionError{err}
 	}
 
