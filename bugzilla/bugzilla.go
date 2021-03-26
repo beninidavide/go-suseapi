@@ -15,7 +15,6 @@ import (
 	"net/url"
 	"path"
 	"regexp"
-	"strconv"
 	"strings"
 	"time"
 
@@ -628,17 +627,15 @@ func (c *Client) Update(id int, changes Changes) (err error) {
 	return
 }
 
-func getAttachmentFromHeaders(id int, header http.Header) (*Attachment, error) {
+func getAttachmentFromResponse(id int, resp *http.Response) (*Attachment, error) {
+	header := resp.Header
 	rawType := header.Get("Content-Disposition")
 	_, info, err := mime.ParseMediaType(rawType)
 	if err != nil {
 		return nil, ConnectionError{fmt.Errorf("failed to parse Content-Disposition: %v", err)}
 	}
 
-	size, err := strconv.Atoi(header.Get("Content-Length"))
-	if err != nil {
-		return nil, ConnectionError{fmt.Errorf("bad Content-Length in response")}
-	}
+	size := int(resp.ContentLength)
 
 	name, _ := info["filename"]
 	att := &Attachment{AttachID: id, Filename: name, Size: size}
@@ -660,7 +657,7 @@ func (c *Client) DownloadAttachment(id int) (*Attachment, io.ReadCloser, error) 
 		return nil, nil, ConnectionError{err}
 	}
 
-	att, err := getAttachmentFromHeaders(id, resp.Header)
+	att, err := getAttachmentFromResponse(id, resp)
 	if err != nil {
 		return nil, nil, err
 	}
