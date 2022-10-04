@@ -1,4 +1,4 @@
-module github.com/bhdn/go-suseapi
+module github.com/beninidavide/go-suseapi
 
 go 1.15
 
