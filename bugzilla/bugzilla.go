@@ -186,6 +186,7 @@ type Bug struct {
 	Classification     string    `xml:"classification" json:"classification"`           // foobar Frobnicator Cloud
 	Product            string    `xml:"product" json:"product"`                         // foobar Frobnicator Cloud 7
 	Component          string    `xml:"component" json:"component"`                     // Frobtool
+	Platform           string    `xml:"platform" json:"platform"`                     
 	Version            string    `xml:"version" json:"version"`                         // Milestone 8
 	RepPlatform        string    `xml:"rep_platform" json:"rep_platform"`               // Other
 	OpSys              string    `xml:"op_sys" json:"op_sys"`                           // Other
